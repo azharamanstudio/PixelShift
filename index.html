@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PixelShift Studio — Pro PNG, JPG & WEBM Converter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Ambient Background Glows -->
+  <div class="bg-glow glow-1"></div>
+  <div class="bg-glow glow-2"></div>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="#" id="brand-home" class="brand" title="Go to Home">
+        <div class="brand-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <div>
+          <span class="brand-name">PixelShift</span>
+          <span class="brand-tag">STUDIO</span>
+        </div>
+      </a>
+
+      <div class="nav-badges">
+        <span class="pill-badge"><span class="dot"></span> 100% Client-Side Privacy</span>
+        <span class="pill-badge">Zero Server Uploads</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container main-content">
+    <!-- Hero Header -->
+    <section id="hero-header" class="hero">
+      <h1>Convert <span class="gradient-text">PNG, JPG & WEBM</span> Seamlessly</h1>
+      <p>Studio-grade media format conversion with live split-screen comparison, smart transparency mattes, compression tuning, and resolution scaling.</p>
+    </section>
+
+    <!-- Upload Dropzone Section -->
+    <section id="upload-section" class="upload-wrapper">
+      <div id="drop-zone" class="drop-zone">
+        <div class="drop-icon-ring">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+        </div>
+        <h2>Drop your PNG, JPG, or WEBM file here</h2>
+        <p>or click below to browse from your device • Supports high-res files up to 50MB</p>
+
+        <div class="upload-btn-group">
+          <label for="file-input" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            Select Image / WEBM
+          </label>
+          <button id="sample-png-btn" type="button" class="btn btn-glass">
+            ✨ Try Sample Transparent PNG
+          </button>
+          <button id="sample-jpg-btn" type="button" class="btn btn-glass">
+            🌄 Try Sample Photo JPG
+          </button>
+          <button id="sample-webm-btn" type="button" class="btn btn-glass">
+            🎬 Try Sample WEBM
+          </button>
+        </div>
+
+        <input type="file" id="file-input" accept="image/png, image/jpeg, video/webm, .webm" hidden />
+
+        <div class="supported-formats">
+          <span>PNG ➔ JPG</span>
+          <span>•</span>
+          <span>JPG ➔ PNG</span>
+          <span>•</span>
+          <span>PNG / JPG ➔ WEBM</span>
+          <span>•</span>
+          <span>WEBM ➔ PNG / JPG</span>
+        </div>
+      </div>
+
+      <!-- Feature Highlights -->
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🎨</div>
+          <h3>Smart Transparency Fill</h3>
+          <p>Converting transparent PNGs to JPG? Automatically replace alpha channels with custom colors instead of ugly black boxes.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔍</div>
+          <h3>Interactive Split Slider</h3>
+          <p>Inspect compression artifacts and color accuracy in real-time by dragging the Before/After comparison slider.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>100% Local Processing</h3>
+          <p>Your photos never leave your computer. Everything runs locally inside your browser for instant speed and total privacy.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Studio Workspace (Hidden until image loaded) -->
+    <section id="workspace-section" class="studio-workspace hidden">
+      <!-- Left Column: Interactive Viewport & Stats -->
+      <div class="studio-viewport-panel">
+        <div class="viewport-toolbar">
+          <div class="view-modes">
+            <button type="button" class="mode-btn active" data-mode="split">Split Slider</button>
+            <button type="button" class="mode-btn" data-mode="converted">Converted Only</button>
+            <button type="button" class="mode-btn" data-mode="original">Original Only</button>
+          </div>
+
+          <div class="viewport-actions">
+            <label for="file-input" class="btn-sm">📂 Load New Image</label>
+            <button id="close-workspace-btn" type="button" class="btn-sm btn-danger">✕ Reset</button>
+          </div>
+        </div>
+
+        <!-- Comparison Stage -->
+        <div id="comparison-stage" class="comparison-stage">
+          <!-- Converted Image (Base Layer) -->
+          <img id="img-converted" src="" alt="Converted Output" class="stage-img" />
+
+          <!-- Original Image (Clipped Overlay Layer for Split Mode) -->
+          <div id="original-overlay" class="original-overlay">
+            <img id="img-original" src="" alt="Original Input" class="stage-img" />
+          </div>
+
+          <!-- Labels -->
+          <span id="badge-original" class="stage-badge badge-left">ORIGINAL</span>
+          <span id="badge-converted" class="stage-badge badge-right">CONVERTED</span>
+
+          <!-- Draggable Split Handle -->
+          <div id="split-handle" class="split-handle">
+            <div class="handle-line"></div>
+            <div class="handle-circle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry & File Metrics Bar -->
+        <div class="metrics-bar">
+          <div class="metric-box">
+            <span class="metric-title">ORIGINAL INPUT</span>
+            <div class="metric-val" id="metric-orig">-</div>
+            <span class="metric-sub" id="metric-orig-dim">-</span>
+          </div>
+
+          <div class="metric-divider">➔</div>
+
+          <div class="metric-box">
+            <span class="metric-title">CONVERTED OUTPUT</span>
+            <div class="metric-val" id="metric-conv">-</div>
+            <span class="metric-sub" id="metric-conv-dim">-</span>
+          </div>
+
+          <div class="metric-box metric-savings">
+            <span class="metric-title">SIZE DELTA</span>
+            <div id="savings-pill" class="savings-pill">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Studio Controls -->
+      <aside class="studio-controls-panel">
+        <div class="panel-header">
+          <h3>Export Configuration</h3>
+          <span id="auto-detect-badge" class="detect-tag">Auto-selected</span>
+        </div>
+
+        <!-- Output Format Selector -->
+        <div class="control-block">
+          <label class="block-label">Target Format</label>
+          <div class="format-cards">
+            <button type="button" id="btn-to-jpg" class="format-card active" data-format="image/jpeg">
+              <div class="fmt-top">
+                <span class="fmt-ext">JPG</span>
+                <span class="fmt-check">●</span>
+              </div>
+              <span class="fmt-desc">Best for photos & small web sizes</span>
+            </button>
+
+            <button type="button" id="btn-to-png" class="format-card" data-format="image/png">
+              <div class="fmt-top">
+                <span class="fmt-ext">PNG</span>
+                <span class="fmt-check">●</span>
+              </div>
+              <span class="fmt-desc">Lossless quality & graphics</span>
+            </button>
+
+            <button type="button" id="btn-to-webm" class="format-card" data-format="video/webm">
+              <div class="fmt-top">
+                <span class="fmt-ext">WEBM</span>
+                <span class="fmt-check">●</span>
+              </div>
+              <span class="fmt-desc">VP8 web video & sticker container</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- JPG & WEBM Compression & Matte Settings -->
+        <div id="jpg-options-group">
+          <div class="control-block">
+            <div class="label-with-val">
+              <label for="quality-range" class="block-label">Compression Quality</label>
+              <span id="quality-readout" class="mono-badge">90%</span>
+            </div>
+            <input type="range" id="quality-range" min="10" max="100" value="90" />
+            <div class="range-labels">
+              <span>Max Compression (10%)</span>
+              <span>Balanced (80%)</span>
+              <span>Maximum (100%)</span>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <div class="label-with-val">
+              <label class="block-label">Transparency Matte Color</label>
+              <span id="hex-readout" class="mono-badge">#FFFFFF</span>
+            </div>
+            <p id="matte-helper-text" class="helper-text">Choose a background fill color for transparent regions:</p>
+            <div class="swatch-row">
+              <button type="button" class="swatch active" data-color="#ffffff" style="background:#ffffff" title="Pure White"></button>
+              <button type="button" class="swatch" data-color="#000000" style="background:#000000" title="Pure Black"></button>
+              <button type="button" class="swatch" data-color="#f1f5f9" style="background:#f1f5f9" title="Slate Gray"></button>
+              <button type="button" class="swatch" data-color="#6366f1" style="background:#6366f1" title="Indigo"></button>
+              <button type="button" class="swatch" data-color="#ec4899" style="background:#ec4899" title="Pink"></button>
+              <label class="custom-color-btn" title="Custom Color Picker">
+                <input type="color" id="custom-color-picker" value="#ffffff" />
+                <span>+</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- WEBM Info Box -->
+        <div id="webm-options-group" class="info-callout hidden">
+          <strong>🎬 VP8 WebM Container</strong>
+          <p>Encodes your image into a lightweight, standards-compliant VP8 <code>.webm</code> container ready for web embeds and stickers.</p>
+        </div>
+
+        <!-- PNG Lossless Info Box -->
+        <div id="png-options-group" class="info-callout hidden">
+          <strong>✨ Lossless PNG Encoding</strong>
+          <p>Your image will be converted to a 24-bit/32-bit uncompressed PNG container with zero generation loss.</p>
+        </div>
+
+        <!-- Output Resolution Scale -->
+        <div class="control-block">
+          <div class="label-with-val">
+            <label class="block-label">Output Dimensions Scale</label>
+            <span id="scale-readout" class="mono-badge">100%</span>
+          </div>
+          <div class="scale-pills">
+            <button type="button" class="scale-btn" data-scale="0.25">25%</button>
+            <button type="button" class="scale-btn" data-scale="0.5">50%</button>
+            <button type="button" class="scale-btn" data-scale="0.75">75%</button>
+            <button type="button" class="scale-btn active" data-scale="1">100%</button>
+          </div>
+        </div>
+
+        <!-- Output Filename -->
+        <div class="control-block">
+          <label for="output-filename" class="block-label">Output Filename</label>
+          <div class="filename-box">
+            <input type="text" id="output-filename" value="converted-image" />
+            <span id="output-ext" class="ext-tag">.jpg</span>
+          </div>
+        </div>
+
+        <!-- Primary Download CTA -->
+        <a id="download-cta" class="btn btn-primary btn-download" download="converted-image.jpg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Download Converted Image</span>
+        </a>
+      </aside>
+    </section>
+
+    <!-- Session Conversion History -->
+    <section id="history-section" class="history-section hidden">
+      <div class="history-header">
+        <h3>Recent Conversions in This Session</h3>
+        <button id="clear-history-btn" type="button" class="btn-sm">Clear History</button>
+      </div>
+      <div id="history-list" class="history-grid"></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
