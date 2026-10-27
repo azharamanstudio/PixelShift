@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PixelShift Studio — Pro PNG, JPG & WEBM Converter</title>
+  <title>PixelShift Studio — Pro PNG, JPG & WEBP Converter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -39,8 +39,8 @@
   <main class="container main-content">
     <!-- Hero Header -->
     <section id="hero-header" class="hero">
-      <h1>Convert <span class="gradient-text">PNG, JPG & WEBM</span> Seamlessly</h1>
-      <p>Studio-grade media format conversion with live split-screen comparison, smart transparency mattes, compression tuning, and resolution scaling.</p>
+      <h1>Convert <span class="gradient-text">PNG, JPG & WEBP</span> Seamlessly</h1>
+      <p>Studio-grade image format conversion with live split-screen comparison, smart transparency mattes, compression tuning, and resolution scaling.</p>
     </section>
 
     <!-- Upload Dropzone Section -->
@@ -53,7 +53,7 @@
             <line x1="12" y1="3" x2="12" y2="15"></line>
           </svg>
         </div>
-        <h2>Drop your PNG, JPG, or WEBM file here</h2>
+        <h2>Drop your PNG, JPG, or WEBP file here</h2>
         <p>or click below to browse from your device • Supports high-res files up to 50MB</p>
 
         <div class="upload-btn-group">
@@ -62,7 +62,7 @@
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
             </svg>
-            Select Image / WEBM
+            Select Image
           </label>
           <button id="sample-png-btn" type="button" class="btn btn-glass">
             ✨ Try Sample Transparent PNG
@@ -70,21 +70,21 @@
           <button id="sample-jpg-btn" type="button" class="btn btn-glass">
             🌄 Try Sample Photo JPG
           </button>
-          <button id="sample-webm-btn" type="button" class="btn btn-glass">
-            🎬 Try Sample WEBM
+          <button id="sample-webp-btn" type="button" class="btn btn-glass">
+            ⚡ Try Sample WEBP
           </button>
         </div>
 
-        <input type="file" id="file-input" accept="image/png, image/jpeg, video/webm, .webm" hidden />
+        <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp, .png, .jpg, .jpeg, .webp" hidden />
 
         <div class="supported-formats">
           <span>PNG ➔ JPG</span>
           <span>•</span>
           <span>JPG ➔ PNG</span>
           <span>•</span>
-          <span>PNG / JPG ➔ WEBM</span>
+          <span>PNG / JPG ➔ WEBP</span>
           <span>•</span>
-          <span>WEBM ➔ PNG / JPG</span>
+          <span>WEBP ➔ PNG / JPG</span>
         </div>
       </div>
 
@@ -128,11 +128,11 @@
         <!-- Comparison Stage -->
         <div id="comparison-stage" class="comparison-stage">
           <!-- Converted Image (Base Layer) -->
-          <img id="img-converted" src="" alt="Converted Output" class="stage-img" />
+          <img id="img-converted" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Converted Output" class="stage-img" />
 
           <!-- Original Image (Clipped Overlay Layer for Split Mode) -->
           <div id="original-overlay" class="original-overlay">
-            <img id="img-original" src="" alt="Original Input" class="stage-img" />
+            <img id="img-original" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Original Input" class="stage-img" />
           </div>
 
           <!-- Labels -->
@@ -203,17 +203,17 @@
               <span class="fmt-desc">Lossless quality & graphics</span>
             </button>
 
-            <button type="button" id="btn-to-webm" class="format-card" data-format="video/webm">
+            <button type="button" id="btn-to-webp" class="format-card" data-format="image/webp">
               <div class="fmt-top">
-                <span class="fmt-ext">WEBM</span>
+                <span class="fmt-ext">WEBP</span>
                 <span class="fmt-check">●</span>
               </div>
-              <span class="fmt-desc">VP8 web video & sticker container</span>
+              <span class="fmt-desc">Next-gen web compression & alpha</span>
             </button>
           </div>
         </div>
 
-        <!-- JPG & WEBM Compression & Matte Settings -->
+        <!-- JPG & WEBP Compression & Matte Settings -->
         <div id="jpg-options-group">
           <div class="control-block">
             <div class="label-with-val">
@@ -235,6 +235,7 @@
             </div>
             <p id="matte-helper-text" class="helper-text">Choose a background fill color for transparent regions:</p>
             <div class="swatch-row">
+              <button type="button" id="swatch-transparent" class="swatch swatch-transparent hidden" data-color="transparent" title="Keep Transparent (Alpha)"></button>
               <button type="button" class="swatch active" data-color="#ffffff" style="background:#ffffff" title="Pure White"></button>
               <button type="button" class="swatch" data-color="#000000" style="background:#000000" title="Pure Black"></button>
               <button type="button" class="swatch" data-color="#f1f5f9" style="background:#f1f5f9" title="Slate Gray"></button>
@@ -248,10 +249,10 @@
           </div>
         </div>
 
-        <!-- WEBM Info Box -->
-        <div id="webm-options-group" class="info-callout hidden">
-          <strong>🎬 VP8 WebM Container</strong>
-          <p>Encodes your image into a lightweight, standards-compliant VP8 <code>.webm</code> container ready for web embeds and stickers.</p>
+        <!-- WEBP Info Box -->
+        <div id="webp-options-group" class="info-callout hidden">
+          <strong>⚡ Next-Gen WebP Encoding</strong>
+          <p>Encodes your image into a modern <code>.webp</code> file with superior compression and optional alpha transparency.</p>
         </div>
 
         <!-- PNG Lossless Info Box -->

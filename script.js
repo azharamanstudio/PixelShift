@@ -6,7 +6,7 @@ const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const samplePngBtn = document.getElementById('sample-png-btn');
 const sampleJpgBtn = document.getElementById('sample-jpg-btn');
-const sampleWebmBtn = document.getElementById('sample-webm-btn');
+const sampleWebpBtn = document.getElementById('sample-webp-btn');
 const closeWorkspaceBtn = document.getElementById('close-workspace-btn');
 const brandHome = document.getElementById('brand-home');
 
@@ -28,16 +28,18 @@ const metricConvDim = document.getElementById('metric-conv-dim');
 const savingsPill = document.getElementById('savings-pill');
 
 // Controls
+const autoDetectBadge = document.getElementById('auto-detect-badge');
 const btnToJpg = document.getElementById('btn-to-jpg');
 const btnToPng = document.getElementById('btn-to-png');
-const btnToWebm = document.getElementById('btn-to-webm');
+const btnToWebp = document.getElementById('btn-to-webp');
 const jpgOptionsGroup = document.getElementById('jpg-options-group');
 const pngOptionsGroup = document.getElementById('png-options-group');
-const webmOptionsGroup = document.getElementById('webm-options-group');
+const webpOptionsGroup = document.getElementById('webp-options-group');
 const matteHelperText = document.getElementById('matte-helper-text');
 const qualityRange = document.getElementById('quality-range');
 const qualityReadout = document.getElementById('quality-readout');
 const swatches = document.querySelectorAll('.swatch');
+const swatchTransparent = document.getElementById('swatch-transparent');
 const customColorPicker = document.getElementById('custom-color-picker');
 const hexReadout = document.getElementById('hex-readout');
 const scaleBtns = document.querySelectorAll('.scale-btn');
@@ -51,6 +53,8 @@ const historySection = document.getElementById('history-section');
 const historyList = document.getElementById('history-list');
 const clearHistoryBtn = document.getElementById('clear-history-btn');
 
+const EMPTY_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 // Track Blob URLs used in session history so they aren't prematurely revoked
 const historyUrls = new Set();
 
@@ -63,13 +67,16 @@ let state = {
   convUrl: '',
   previewUrl: '',
   convSize: 0,
+  convFormat: 'image/jpeg',
   targetFormat: 'image/jpeg',
   quality: 0.9,
   matteColor: '#ffffff',
+  lastSolidMatte: '#ffffff',
   scale: 1,
   viewMode: 'split',
   splitPos: 50,
   isDraggingSplit: false,
+  loadId: 0,
   renderId: 0
 };
 
@@ -86,168 +93,17 @@ function getSanitizedFilename(ext) {
   // Strip illegal filesystem characters
   raw = raw.replace(/[<>:"/\\|?*\x00-\x1F]/g, '-');
   // Strip redundant trailing extension if user typed it manually
-  raw = raw.replace(/\.(jpe?g|png|webm)$/i, '');
+  raw = raw.replace(/\.(jpe?g|png|webp)$/i, '');
+  // Trim leading/trailing dots and spaces
+  raw = raw.replace(/^[.\s]+|[.\s]+$/g, '');
   return `${raw || 'converted'}.${ext}`;
 }
 
 // Format Extension Helper
 function getFormatExt(fmt) {
   if (fmt === 'image/jpeg') return 'jpg';
-  if (fmt === 'video/webm') return 'webm';
+  if (fmt === 'image/webp') return 'webp';
   return 'png';
-}
-
-// EBML / WebM Muxer Utilities (Wraps VP8 bitstream into a valid WebM container)
-function concatUint8Arrays(arrays) {
-  const totalLen = arrays.reduce((acc, arr) => acc + arr.length, 0);
-  const out = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const arr of arrays) {
-    out.set(arr, offset);
-    offset += arr.length;
-  }
-  return out;
-}
-
-function ebmlElement(idBytes, data) {
-  const payload = Array.isArray(data) ? concatUint8Arrays(data) : data;
-  const len = payload.length;
-  let sizeVint;
-  if (len < 127) {
-    sizeVint = new Uint8Array([0x80 | len]);
-  } else {
-    sizeVint = new Uint8Array([
-      0x10 | ((len >>> 24) & 0x0f),
-      (len >>> 16) & 0xff,
-      (len >>> 8) & 0xff,
-      len & 0xff
-    ]);
-  }
-  return concatUint8Arrays([new Uint8Array(idBytes), sizeVint, payload]);
-}
-
-function ebmlUint(idBytes, num) {
-  const bytes = [];
-  let n = num >>> 0;
-  do {
-    bytes.unshift(n & 0xff);
-    n = n >>> 8;
-  } while (n > 0);
-  return ebmlElement(idBytes, new Uint8Array(bytes));
-}
-
-function ebmlAscii(idBytes, str) {
-  const bytes = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i);
-  return ebmlElement(idBytes, bytes);
-}
-
-function ebmlFloat32(idBytes, val) {
-  const buf = new ArrayBuffer(4);
-  new DataView(buf).setFloat32(0, val, false);
-  return ebmlElement(idBytes, new Uint8Array(buf));
-}
-
-function muxVp8ToWebm(vp8FrameBytes, width, height) {
-  const ebmlHeader = ebmlElement([0x1a, 0x45, 0xdf, 0xa3], [
-    ebmlUint([0x42, 0x86], 1),
-    ebmlUint([0x42, 0xf7], 1),
-    ebmlUint([0x42, 0xf2], 4),
-    ebmlUint([0x42, 0xf3], 8),
-    ebmlAscii([0x42, 0x82], 'webm'),
-    ebmlUint([0x42, 0x87], 2),
-    ebmlUint([0x42, 0x85], 2)
-  ]);
-
-  const segmentInfo = ebmlElement([0x15, 0x49, 0xa9, 0x66], [
-    ebmlUint([0x2a, 0xd7, 0xb1], 1000000),
-    ebmlAscii([0x4d, 0x80], 'PixelShift Studio'),
-    ebmlAscii([0x57, 0x41], 'PixelShift Studio'),
-    ebmlFloat32([0x44, 0x89], 1000.0)
-  ]);
-
-  const videoSettings = ebmlElement([0xe0], [
-    ebmlUint([0xb0], width),
-    ebmlUint([0xba], height)
-  ]);
-
-  const trackEntry = ebmlElement([0xae], [
-    ebmlUint([0xd7], 1),
-    ebmlUint([0x73, 0xc5], 1),
-    ebmlUint([0x9c], 0),
-    ebmlAscii([0x22, 0xb5, 0x9c], 'und'),
-    ebmlAscii([0x86], 'V_VP8'),
-    ebmlUint([0x83], 1),
-    videoSettings
-  ]);
-
-  const tracks = ebmlElement([0x16, 0x54, 0xae, 0x6b], trackEntry);
-
-  const simpleBlockPayload = concatUint8Arrays([
-    new Uint8Array([0x81, 0x00, 0x00, 0x80]),
-    vp8FrameBytes
-  ]);
-
-  const cluster = ebmlElement([0x1f, 0x43, 0xb6, 0x75], [
-    ebmlUint([0xe7], 0),
-    ebmlElement([0xa3], simpleBlockPayload)
-  ]);
-
-  const segment = ebmlElement([0x18, 0x53, 0x80, 0x67], [
-    segmentInfo,
-    tracks,
-    cluster
-  ]);
-
-  return new Blob([ebmlHeader, segment], { type: 'video/webm' });
-}
-
-function canvasToWebm(canvas, quality, callback) {
-  const clampedQ = Math.min(0.99, Math.max(0.1, quality));
-  const webpDataUrl = canvas.toDataURL('image/webp', clampedQ);
-
-  if (webpDataUrl.startsWith('data:image/webp;base64,')) {
-    const binStr = atob(webpDataUrl.split(',')[1]);
-    const bytes = new Uint8Array(binStr.length);
-    for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
-
-    // Locate 'VP8 ' chunk inside RIFF WEBP container
-    let offset = 12;
-    let vp8Bytes = null;
-    while (offset + 8 <= bytes.length) {
-      const fourCC = String.fromCharCode(
-        bytes[offset],
-        bytes[offset + 1],
-        bytes[offset + 2],
-        bytes[offset + 3]
-      );
-      const chunkSize =
-        (bytes[offset + 4] |
-          (bytes[offset + 5] << 8) |
-          (bytes[offset + 6] << 16) |
-          (bytes[offset + 7] << 24)) >>>
-        0;
-      const dataStart = offset + 8;
-      if (dataStart + chunkSize > bytes.length) break;
-      if (fourCC === 'VP8 ') {
-        vp8Bytes = bytes.subarray(dataStart, dataStart + chunkSize);
-        break;
-      }
-      offset = dataStart + chunkSize + (chunkSize % 2);
-    }
-
-    if (vp8Bytes) {
-      const webmBlob = muxVp8ToWebm(vp8Bytes, canvas.width, canvas.height);
-      const previewBlob = new Blob([bytes], { type: 'image/webp' });
-      callback(webmBlob, previewBlob);
-      return;
-    }
-  }
-
-  // Fallback for browsers without WebP VP8 export
-  canvas.toBlob((previewBlob) => {
-    callback(previewBlob, previewBlob);
-  }, 'image/jpeg', clampedQ);
 }
 
 // Format File Size Utility
@@ -287,79 +143,48 @@ fileInput.addEventListener('change', (e) => {
 function processFile(file) {
   const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
   const isJpg = file.type === 'image/jpeg' || /\.(jpe?g)$/i.test(file.name);
-  const isWebm = file.type === 'video/webm' || file.name.toLowerCase().endsWith('.webm');
+  const isWebp = file.type === 'image/webp' || file.name.toLowerCase().endsWith('.webp');
 
-  if (!isPng && !isJpg && !isWebm) {
-    alert('Unsupported file! Please upload a PNG, JPG, or WEBM file.');
+  if (!isPng && !isJpg && !isWebp) {
+    alert('Unsupported file! Please upload a PNG, JPG, or WEBP file.');
     return;
   }
 
-  safeRevokeUrl(state.origUrl);
-  state.origSize = file.size;
-  state.origFormat = isPng ? 'PNG' : isWebm ? 'WEBM' : 'JPG';
-
-  // Auto-select target format
-  const autoTarget = isPng ? 'image/jpeg' : 'image/png';
-  selectFormat(autoTarget, false);
-
-  const cleanBase = file.name.replace(/\.[^/.]+$/, '');
-  outputFilename.value = `${cleanBase}-pixelshift`;
-
-  if (isWebm) {
-    const videoUrl = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'auto';
-    video.muted = true;
-    video.playsInline = true;
-
-    let extracted = false;
-    const extractFrame = () => {
-      if (extracted) return;
-      extracted = true;
-      const c = document.createElement('canvas');
-      c.width = video.videoWidth || 800;
-      c.height = video.videoHeight || 540;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(video, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(videoUrl);
-
-      c.toBlob((frameBlob) => {
-        if (!frameBlob) return;
-        state.origUrl = URL.createObjectURL(frameBlob);
-        const img = new Image();
-        img.onload = () => {
-          state.imageElement = img;
-          imgOriginal.src = state.origUrl;
-          uploadSection.classList.add('hidden');
-          heroHeader.classList.add('hidden');
-          workspaceSection.classList.remove('hidden');
-          renderConversion();
-        };
-        img.src = state.origUrl;
-      }, 'image/png');
-    };
-
-    video.addEventListener('loadeddata', () => {
-      video.currentTime = 0.001;
-      setTimeout(extractFrame, 250);
-    }, { once: true });
-    video.addEventListener('seeked', extractFrame, { once: true });
-    video.addEventListener('error', () => {
-      URL.revokeObjectURL(videoUrl);
-      if (!extracted) {
-        alert('Could not decode this WEBM file. Please ensure it is a valid video/webm file.');
-      }
-    }, { once: true });
-    video.src = videoUrl;
-    video.load();
+  if (file.size > 50 * 1024 * 1024) {
+    alert('File is too large! Please upload an image up to 50MB.');
     return;
   }
 
-  state.origUrl = URL.createObjectURL(file);
+  const currentLoadId = ++state.loadId;
+  const nextOrigUrl = URL.createObjectURL(file);
   const img = new Image();
+
   img.onload = () => {
+    if (currentLoadId !== state.loadId) {
+      URL.revokeObjectURL(nextOrigUrl);
+      return;
+    }
+
+    safeRevokeUrl(state.origUrl);
+    safeRevokeUrl(state.convUrl);
+    state.origUrl = nextOrigUrl;
+    state.convUrl = '';
+    state.previewUrl = '';
+    state.convSize = 0;
+    state.origSize = file.size;
+    state.origFormat = isPng ? 'PNG' : isWebp ? 'WEBP' : 'JPG';
     state.imageElement = img;
+    downloadCta.removeAttribute('href');
+
+    const cleanBase = file.name.replace(/\.[^/.]+$/, '');
+    outputFilename.value = `${cleanBase || 'image'}-pixelshift`;
+
+    // Auto-select target format
+    const autoTarget = isPng ? 'image/jpeg' : 'image/png';
+    selectFormat(autoTarget, false, true);
+
     imgOriginal.src = state.origUrl;
+    imgConverted.src = state.origUrl;
 
     uploadSection.classList.add('hidden');
     heroHeader.classList.add('hidden');
@@ -367,12 +192,14 @@ function processFile(file) {
 
     renderConversion();
   };
+
   img.onerror = () => {
-    safeRevokeUrl(state.origUrl);
-    state.origUrl = '';
-    alert('Failed to load the selected image file.');
+    URL.revokeObjectURL(nextOrigUrl);
+    if (currentLoadId !== state.loadId) return;
+    alert('Failed to load the selected image file. Please ensure it is a valid PNG, JPG, or WEBP image.');
   };
-  img.src = state.origUrl;
+
+  img.src = nextOrigUrl;
 }
 
 // Core Canvas Conversion Engine
@@ -380,17 +207,23 @@ function renderConversion() {
   if (!state.imageElement) return;
 
   const currentRenderId = ++state.renderId;
-  const targetW = Math.max(1, Math.round(state.imageElement.naturalWidth * state.scale));
-  const targetH = Math.max(1, Math.round(state.imageElement.naturalHeight * state.scale));
+  const targetFmt = state.targetFormat;
+  const origW = state.imageElement.naturalWidth || state.imageElement.width || 800;
+  const origH = state.imageElement.naturalHeight || state.imageElement.height || 600;
+  const targetW = Math.max(1, Math.round(origW * state.scale));
+  const targetH = Math.max(1, Math.round(origH * state.scale));
 
   const canvas = document.createElement('canvas');
   canvas.width = targetW;
   canvas.height = targetH;
   const ctx = canvas.getContext('2d');
 
-  // Fill background matte color if converting to JPG or WEBM
-  if (state.targetFormat === 'image/jpeg' || state.targetFormat === 'video/webm') {
-    ctx.fillStyle = state.matteColor;
+  // Fill background matte color if converting to JPG, or to WEBP with a solid matte selected
+  if (
+    targetFmt === 'image/jpeg' ||
+    (targetFmt === 'image/webp' && state.matteColor !== 'transparent')
+  ) {
+    ctx.fillStyle = state.matteColor === 'transparent' ? '#ffffff' : state.matteColor;
     ctx.fillRect(0, 0, targetW, targetH);
   }
 
@@ -398,47 +231,38 @@ function renderConversion() {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(state.imageElement, 0, 0, targetW, targetH);
 
-  if (state.targetFormat === 'video/webm') {
-    canvasToWebm(canvas, state.quality, (webmBlob, previewBlob) => {
-      if (currentRenderId !== state.renderId || !webmBlob) return;
-      safeRevokeUrl(state.convUrl);
-      safeRevokeUrl(state.previewUrl);
-
-      state.convUrl = URL.createObjectURL(webmBlob);
-      state.previewUrl = URL.createObjectURL(previewBlob);
-      state.convSize = webmBlob.size;
-      imgConverted.src = state.previewUrl;
-
-      updateStudioMetrics(targetW, targetH);
-    });
-    return;
-  }
+  const qualityArg =
+    targetFmt === 'image/jpeg' || targetFmt === 'image/webp'
+      ? state.quality
+      : undefined;
 
   canvas.toBlob(
     (blob) => {
       if (currentRenderId !== state.renderId || !blob) return;
       safeRevokeUrl(state.convUrl);
-      safeRevokeUrl(state.previewUrl);
 
       state.convUrl = URL.createObjectURL(blob);
       state.previewUrl = state.convUrl;
       state.convSize = blob.size;
+      state.convFormat = targetFmt;
       imgConverted.src = state.previewUrl;
 
-      updateStudioMetrics(targetW, targetH);
+      updateStudioMetrics(targetW, targetH, targetFmt);
     },
-    state.targetFormat,
-    state.targetFormat === 'image/jpeg' ? state.quality : undefined
+    targetFmt,
+    qualityArg
   );
 }
 
 // Update Telemetry & Download Link
-function updateStudioMetrics(w, h) {
-  const ext = getFormatExt(state.targetFormat);
+function updateStudioMetrics(w, h, fmt = state.targetFormat) {
+  const ext = getFormatExt(fmt);
   const targetLabel = ext.toUpperCase();
+  const origW = state.imageElement.naturalWidth || state.imageElement.width || w;
+  const origH = state.imageElement.naturalHeight || state.imageElement.height || h;
 
   metricOrig.textContent = `${state.origFormat} • ${formatBytes(state.origSize)}`;
-  metricOrigDim.textContent = `${state.imageElement.naturalWidth} × ${state.imageElement.naturalHeight} px`;
+  metricOrigDim.textContent = `${origW} × ${origH} px`;
 
   metricConv.textContent = `${targetLabel} • ${formatBytes(state.convSize)}`;
   metricConvDim.textContent = `${w} × ${h} px`;
@@ -466,34 +290,60 @@ function updateStudioMetrics(w, h) {
   downloadCta.download = finalName;
 }
 
+// Sync active swatch highlight with current state.matteColor
+function syncSwatchHighlight() {
+  swatches.forEach((s) => {
+    s.classList.toggle('active', s.dataset.color.toLowerCase() === state.matteColor.toLowerCase());
+  });
+  if (state.matteColor === 'transparent') {
+    hexReadout.textContent = 'ALPHA';
+  } else {
+    hexReadout.textContent = state.matteColor.toUpperCase();
+    customColorPicker.value = state.matteColor;
+  }
+}
+
 // Format Selection
-function selectFormat(fmt, reRender = true) {
+function selectFormat(fmt, reRender = true, isAuto = false) {
   state.targetFormat = fmt;
   btnToJpg.classList.toggle('active', fmt === 'image/jpeg');
   btnToPng.classList.toggle('active', fmt === 'image/png');
-  btnToWebm.classList.toggle('active', fmt === 'video/webm');
+  btnToWebp.classList.toggle('active', fmt === 'image/webp');
+
+  if (autoDetectBadge) {
+    autoDetectBadge.textContent = isAuto ? 'Auto-selected' : 'Custom selected';
+  }
+
+  const ext = getFormatExt(fmt);
+  outputExt.textContent = `.${ext}`;
 
   if (fmt === 'image/jpeg') {
     jpgOptionsGroup.classList.remove('hidden');
     pngOptionsGroup.classList.add('hidden');
-    webmOptionsGroup.classList.add('hidden');
+    webpOptionsGroup.classList.add('hidden');
+    if (swatchTransparent) swatchTransparent.classList.add('hidden');
+    if (state.matteColor === 'transparent') {
+      state.matteColor = state.lastSolidMatte || '#ffffff';
+      syncSwatchHighlight();
+    }
     matteHelperText.textContent = "JPG doesn't support transparent pixels. Choose a background fill color:";
-  } else if (fmt === 'video/webm') {
+  } else if (fmt === 'image/webp') {
     jpgOptionsGroup.classList.remove('hidden');
     pngOptionsGroup.classList.add('hidden');
-    webmOptionsGroup.classList.remove('hidden');
-    matteHelperText.textContent = 'Choose a background canvas matte color for the VP8 WebM frame:';
+    webpOptionsGroup.classList.remove('hidden');
+    if (swatchTransparent) swatchTransparent.classList.remove('hidden');
+    matteHelperText.textContent = 'Keep alpha transparency or choose a background matte color:';
   } else {
     jpgOptionsGroup.classList.add('hidden');
     pngOptionsGroup.classList.remove('hidden');
-    webmOptionsGroup.classList.add('hidden');
+    webpOptionsGroup.classList.add('hidden');
   }
   if (reRender) renderConversion();
 }
 
-btnToJpg.addEventListener('click', () => selectFormat('image/jpeg'));
-btnToPng.addEventListener('click', () => selectFormat('image/png'));
-btnToWebm.addEventListener('click', () => selectFormat('video/webm'));
+btnToJpg.addEventListener('click', () => selectFormat('image/jpeg', true, false));
+btnToPng.addEventListener('click', () => selectFormat('image/png', true, false));
+btnToWebp.addEventListener('click', () => selectFormat('image/webp', true, false));
 
 // Quality Slider
 qualityRange.addEventListener('input', (e) => {
@@ -506,20 +356,20 @@ qualityRange.addEventListener('input', (e) => {
 // Transparency Swatches & Custom Color
 swatches.forEach((btn) => {
   btn.addEventListener('click', () => {
-    swatches.forEach((s) => s.classList.remove('active'));
-    btn.classList.add('active');
     const c = btn.dataset.color;
     state.matteColor = c;
-    customColorPicker.value = c;
-    hexReadout.textContent = c.toUpperCase();
+    if (c !== 'transparent') {
+      state.lastSolidMatte = c;
+    }
+    syncSwatchHighlight();
     renderConversion();
   });
 });
 
 customColorPicker.addEventListener('input', (e) => {
-  swatches.forEach((s) => s.classList.remove('active'));
   state.matteColor = e.target.value;
-  hexReadout.textContent = e.target.value.toUpperCase();
+  state.lastSolidMatte = e.target.value;
+  syncSwatchHighlight();
   renderConversion();
 });
 
@@ -563,6 +413,8 @@ comparisonStage.addEventListener('touchstart', (e) => {
   setSplitPosition(e.touches[0].clientX);
 }, { passive: true });
 window.addEventListener('touchend', () => (state.isDraggingSplit = false));
+window.addEventListener('touchcancel', () => (state.isDraggingSplit = false));
+window.addEventListener('blur', () => (state.isDraggingSplit = false));
 window.addEventListener('touchmove', (e) => {
   if (state.isDraggingSplit && state.viewMode === 'split' && e.touches[0]) {
     setSplitPosition(e.touches[0].clientX);
@@ -577,17 +429,20 @@ modeBtns.forEach((btn) => {
     state.viewMode = btn.dataset.mode;
 
     if (state.viewMode === 'split') {
+      comparisonStage.classList.remove('no-split');
       originalOverlay.classList.remove('hidden');
       splitHandle.classList.remove('hidden');
       badgeOriginal.classList.remove('hidden');
       badgeConverted.classList.remove('hidden');
       originalOverlay.style.clipPath = `inset(0 ${100 - state.splitPos}% 0 0)`;
     } else if (state.viewMode === 'converted') {
+      comparisonStage.classList.add('no-split');
       originalOverlay.classList.add('hidden');
       splitHandle.classList.add('hidden');
       badgeOriginal.classList.add('hidden');
       badgeConverted.classList.remove('hidden');
     } else {
+      comparisonStage.classList.add('no-split');
       originalOverlay.classList.remove('hidden');
       originalOverlay.style.clipPath = 'inset(0 0 0 0)';
       splitHandle.classList.add('hidden');
@@ -599,7 +454,7 @@ modeBtns.forEach((btn) => {
 
 // Filename Sync & History Logging on Download
 outputFilename.addEventListener('input', () => {
-  const ext = getFormatExt(state.targetFormat);
+  const ext = getFormatExt(state.convFormat || state.targetFormat);
   downloadCta.download = getSanitizedFilename(ext);
 });
 
@@ -619,8 +474,10 @@ function addToSessionHistory() {
   historyUrls.add(state.convUrl);
   if (state.previewUrl) historyUrls.add(state.previewUrl);
 
-  const ext = getFormatExt(state.targetFormat).toUpperCase();
-  const finalDownloadName = downloadCta.download;
+  const extNum = getFormatExt(state.convFormat || state.targetFormat);
+  const ext = extNum.toUpperCase();
+  const finalDownloadName = getSanitizedFilename(extNum);
+  downloadCta.download = finalDownloadName;
 
   const item = document.createElement('div');
   item.className = 'history-item';
@@ -670,6 +527,7 @@ clearHistoryBtn.addEventListener('click', () => {
 
 // Sample Generators
 samplePngBtn.addEventListener('click', () => {
+  const sampleLoadId = ++state.loadId;
   const c = document.createElement('canvas');
   c.width = 800;
   c.height = 540;
@@ -700,11 +558,13 @@ samplePngBtn.addEventListener('click', () => {
   ctx.fillText('Drag the split slider & test matte colors!', 400, 310);
 
   c.toBlob((blob) => {
+    if (!blob || sampleLoadId !== state.loadId) return;
     processFile(new File([blob], 'sample-transparent-logo.png', { type: 'image/png' }));
   }, 'image/png');
 });
 
 sampleJpgBtn.addEventListener('click', () => {
+  const sampleLoadId = ++state.loadId;
   const c = document.createElement('canvas');
   c.width = 800;
   c.height = 540;
@@ -736,11 +596,13 @@ sampleJpgBtn.addEventListener('click', () => {
   ctx.fill();
 
   c.toBlob((blob) => {
+    if (!blob || sampleLoadId !== state.loadId) return;
     processFile(new File([blob], 'sunset-mountain-photo.jpg', { type: 'image/jpeg' }));
   }, 'image/jpeg', 0.92);
 });
 
-sampleWebmBtn.addEventListener('click', () => {
+sampleWebpBtn.addEventListener('click', () => {
+  const sampleLoadId = ++state.loadId;
   const c = document.createElement('canvas');
   c.width = 800;
   c.height = 540;
@@ -769,19 +631,58 @@ sampleWebmBtn.addEventListener('click', () => {
   ctx.fillStyle = '#ffffff';
   ctx.font = '800 38px Inter, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('WEBM VP8 FRAME', 400, 250);
+  ctx.fillText('NEXT-GEN WEBP', 400, 250);
   ctx.fillStyle = '#38bdf8';
   ctx.font = '600 20px Inter, sans-serif';
-  ctx.fillText('Convert WEBM to PNG or JPG Instantly', 400, 290);
+  ctx.fillText('Convert WEBP to PNG or JPG Instantly', 400, 290);
 
-  canvasToWebm(c, 0.92, (webmBlob) => {
-    processFile(new File([webmBlob], 'sample-vp8-frame.webm', { type: 'video/webm' }));
-  });
+  c.toBlob((blob) => {
+    if (!blob || sampleLoadId !== state.loadId) return;
+    processFile(new File([blob], 'sample-nextgen-graphic.webp', { type: 'image/webp' }));
+  }, 'image/webp', 0.92);
 });
 
 // Reset Workspace / Go to Home
 function goToHome(e) {
   if (e) e.preventDefault();
+  state.loadId++;
+  state.renderId++;
+  safeRevokeUrl(state.origUrl);
+  safeRevokeUrl(state.convUrl);
+  state.origUrl = '';
+  state.convUrl = '';
+  state.previewUrl = '';
+  state.convSize = 0;
+  state.imageElement = null;
+
+  // Reset studio controls to defaults
+  state.quality = 0.9;
+  qualityRange.value = '90';
+  qualityReadout.textContent = '90%';
+
+  state.matteColor = '#ffffff';
+  state.lastSolidMatte = '#ffffff';
+  syncSwatchHighlight();
+
+  state.scale = 1;
+  scaleReadout.textContent = '100%';
+  scaleBtns.forEach((b) => b.classList.toggle('active', b.dataset.scale === '1'));
+
+  state.viewMode = 'split';
+  state.splitPos = 50;
+  state.isDraggingSplit = false;
+  modeBtns.forEach((b) => b.classList.toggle('active', b.dataset.mode === 'split'));
+  comparisonStage.classList.remove('no-split');
+  originalOverlay.classList.remove('hidden');
+  splitHandle.classList.remove('hidden');
+  badgeOriginal.classList.remove('hidden');
+  badgeConverted.classList.remove('hidden');
+  splitHandle.style.left = '50%';
+  originalOverlay.style.clipPath = 'inset(0 50% 0 0)';
+
+  imgOriginal.src = EMPTY_PIXEL;
+  imgConverted.src = EMPTY_PIXEL;
+  downloadCta.removeAttribute('href');
   fileInput.value = '';
   workspaceSection.classList.add('hidden');
   uploadSection.classList.remove('hidden');
